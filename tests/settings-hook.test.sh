@@ -89,6 +89,27 @@ test_invalid_json_fails_and_is_not_changed() {
   [ "$(cat "$T/settings.json")" = '{bad' ] || fail "file changed"
 }
 
+test_unreadable_file_is_left_alone() {
+  user_settings
+  chmod 000 "$T/settings.json"
+  hook add "$T/settings.json" "$HOOK" && fail "add succeeded on unreadable file"
+  chmod 644 "$T/settings.json"
+  cmp -s "$T/original.json" "$T/settings.json" || fail "file changed"
+}
+
+test_symlinked_settings_stays_a_symlink() {
+  mkdir "$T/dotfiles"
+  user_settings
+  mv "$T/settings.json" "$T/dotfiles/settings.json"
+  ln -s "$T/dotfiles/settings.json" "$T/settings.json"
+  hook add "$T/settings.json" "$HOOK" || fail "add failed"
+  [ -L "$T/settings.json" ] || fail "symlink replaced"
+  [ "$(field "$T/dotfiles/settings.json" hooks.UserPromptSubmit.1.hooks.0.command)" = "$HOOK" ] || fail "hook not in target"
+  hook remove "$T/settings.json" || fail "remove failed"
+  [ -L "$T/settings.json" ] || fail "symlink replaced on remove"
+  cmp -s "$T/original.json" "$T/dotfiles/settings.json" || fail "target differs from the original"
+}
+
 for CASE in $(declare -F | awk '$3 ~ /^test_/ {print $3}'); do
   setup
   "$CASE"
