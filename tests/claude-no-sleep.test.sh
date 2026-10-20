@@ -136,7 +136,11 @@ test_failed_write_is_logged() {
   touch "$T/pmset_fails"
   session 101 busy
   run poll || fail "exit $?"
-  grep -q 'disablesleep 1 failed' "$T/state/log" || fail "no failure line in log"
+  run poll || fail "exit $?"
+  [ "$(grep -c 'disablesleep 1 failed' "$T/state/log")" = 1 ] || fail "want one failure line"
+  rm "$T/pmset_fails"
+  run poll
+  grep -q 'disablesleep 1 (' "$T/state/log" || fail "no success line after recovery"
 }
 
 test_unknown_status_counts_as_idle_and_notifies_once() {

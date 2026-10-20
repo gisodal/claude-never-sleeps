@@ -14,6 +14,7 @@ OSASCRIPT=${CLAUDE_NO_SLEEP_OSASCRIPT:-/usr/bin/osascript}
 
 MANUAL_FLAG=$STATE_DIR/manual
 WAKE_STAMP=$STATE_DIR/wake
+WRITE_FAILED_MARKER=$STATE_DIR/write-failed
 LOG=$STATE_DIR/log
 WAKE_GRACE_SECONDS=60
 
@@ -26,13 +27,19 @@ squeeze_spaces() { tr -s ' ' | sed 's/^ //;s/ $//'; }
 sleep_disabled_now() { "$PMSET" -g | awk '/SleepDisabled/ {print $2}'; }
 
 set_sleep_disabled() {
-  local value=$1 reason=$2
-  [ "$(sleep_disabled_now)" = "$value" ] && return 0
+  local value=$1 reason=$2 output
+  if [ "$(sleep_disabled_now)" = "$value" ]; then
+    rm -f "$WRITE_FAILED_MARKER"
+    return 0
+  fi
   # SUDO stays unquoted: it is a command with a flag, or empty in tests
-  if $SUDO "$PMSET" -a disablesleep "$value"; then
+  if output=$($SUDO "$PMSET" -a disablesleep "$value" 2>&1); then
+    rm -f "$WRITE_FAILED_MARKER"
     log "disablesleep $value ($reason)"
   else
-    log "disablesleep $value failed ($reason)"
+    # log a failed write once, not on every poll that retries it
+    [ "$(cat "$WRITE_FAILED_MARKER" 2>/dev/null)" = "$value" ] || log "disablesleep $value failed ($reason): $output"
+    echo "$value" >"$WRITE_FAILED_MARKER"
   fi
 }
 
