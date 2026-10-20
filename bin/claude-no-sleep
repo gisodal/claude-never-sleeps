@@ -1,0 +1,124 @@
+#!/bin/bash
+# Keeps the Mac awake, lid close included, while any Claude Code session works.
+# launchd runs "poll" every 10 s; the UserPromptSubmit hook runs "wake" so a lid closed right after a prompt cannot beat the first poll.
+
+set -u
+
+CLAUDE_DIR=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+SESSIONS_DIR=${CLAUDE_NO_SLEEP_SESSIONS_DIR:-$CLAUDE_DIR/sessions}
+STATE_DIR=${CLAUDE_NO_SLEEP_STATE_DIR:-$HOME/.local/state/claude-no-sleep}
+PMSET=${CLAUDE_NO_SLEEP_PMSET:-/usr/bin/pmset}
+SUDO=${CLAUDE_NO_SLEEP_SUDO-/usr/bin/sudo -n}
+PS=${CLAUDE_NO_SLEEP_PS:-/bin/ps}
+OSASCRIPT=${CLAUDE_NO_SLEEP_OSASCRIPT:-/usr/bin/osascript}
+
+MANUAL_FLAG=$STATE_DIR/manual
+WAKE_STAMP=$STATE_DIR/wake
+LOG=$STATE_DIR/log
+WAKE_GRACE_SECONDS=60
+
+log() { echo "$(/bin/date -Iseconds) $*" >>"$LOG"; }
+
+json_field() { /usr/bin/plutil -extract "$2" raw -o - "$1" 2>/dev/null; }
+
+squeeze_spaces() { tr -s ' ' | sed 's/^ //;s/ $//'; }
+
+sleep_disabled_now() { "$PMSET" -g | awk '/SleepDisabled/ {print $2}'; }
+
+set_sleep_disabled() {
+  local value=$1 reason=$2
+  [ "$(sleep_disabled_now)" = "$value" ] && return 0
+  # SUDO stays unquoted: it is a command with a flag, or empty in tests
+  if $SUDO "$PMSET" -a disablesleep "$value"; then
+    log "disablesleep $value ($reason)"
+  else
+    log "disablesleep $value failed ($reason)"
+  fi
+}
+
+# a pid counts only while the process that wrote the file runs; the registry stores its start as ps lstart in UTC
+session_process_alive() {
+  local pid=$1 proc_start=$2 started
+  started=$(TZ=UTC "$PS" -o lstart= -p "$pid" 2>/dev/null) || return 1
+  [ "$(squeeze_spaces <<<"$started")" = "$(squeeze_spaces <<<"$proc_start")" ]
+}
+
+report_unknown_status() {
+  local status=$1
+  [ -e "$STATE_DIR/seen-status-$status" ] && return 0
+  touch "$STATE_DIR/seen-status-$status"
+  log "unknown session status '$status', counted as idle"
+  "$OSASCRIPT" -e "display notification \"Unknown session status '$status', counted as idle\" with title \"claude-no-sleep\"" >/dev/null 2>&1
+}
+
+session_is_working() {
+  local file=$1 pid status proc_start
+  pid=$(json_field "$file" pid) || return 1
+  status=$(json_field "$file" status) || return 1
+  proc_start=$(json_field "$file" procStart) || return 1
+  session_process_alive "$pid" "$proc_start" || return 1
+  case $status in
+    busy | shell) return 0 ;;
+    idle) return 1 ;;
+    *)
+      report_unknown_status "$status"
+      return 1
+      ;;
+  esac
+}
+
+any_session_working() {
+  local file
+  for file in "$SESSIONS_DIR"/*.json; do
+    [ -e "$file" ] || continue
+    session_is_working "$file" && return 0
+  done
+  return 1
+}
+
+wake_requested_recently() {
+  [ -e "$WAKE_STAMP" ] || return 1
+  [ $(($(/bin/date +%s) - $(/usr/bin/stat -f %m "$WAKE_STAMP"))) -lt "$WAKE_GRACE_SECONDS" ]
+}
+
+poll() {
+  if [ -e "$MANUAL_FLAG" ]; then
+    set_sleep_disabled 1 manual
+  elif wake_requested_recently; then
+    set_sleep_disabled 1 prompt
+  elif any_session_working; then
+    set_sleep_disabled 1 working
+  else
+    set_sleep_disabled 0 idle
+  fi
+}
+
+wake() {
+  touch "$WAKE_STAMP"
+  set_sleep_disabled 1 prompt
+}
+
+status() {
+  local file working
+  echo "SleepDisabled: $(sleep_disabled_now)"
+  if [ -e "$MANUAL_FLAG" ]; then echo "manual override: on"; else echo "manual override: off"; fi
+  for file in "$SESSIONS_DIR"/*.json; do
+    [ -e "$file" ] || continue
+    working=no
+    session_is_working "$file" && working=yes
+    echo "session $(json_field "$file" pid): status $(json_field "$file" status), keeps the Mac awake: $working"
+  done
+}
+
+mkdir -p "$STATE_DIR"
+case "${1:-}" in
+  poll) poll ;;
+  wake) wake ;;
+  status) status ;;
+  manual-on) touch "$MANUAL_FLAG" && poll ;;
+  manual-off) rm -f "$MANUAL_FLAG" && poll ;;
+  *)
+    echo "usage: claude-no-sleep poll|wake|status|manual-on|manual-off" >&2
+    exit 1
+    ;;
+esac
