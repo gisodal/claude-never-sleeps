@@ -110,6 +110,18 @@ test_symlinked_settings_stays_a_symlink() {
   cmp -s "$T/original.json" "$T/dotfiles/settings.json" || fail "target differs from the original"
 }
 
+test_remove_without_our_hook_leaves_the_bytes() {
+  printf '{\n    "model": "opus"\n}\n' >"$T/settings.json"
+  cp "$T/settings.json" "$T/original.json"
+  hook remove "$T/settings.json" || fail "remove failed"
+  cmp -s "$T/original.json" "$T/settings.json" || fail "file changed"
+}
+
+test_remove_on_a_missing_file_creates_nothing() {
+  hook remove "$T/settings.json" || fail "remove failed"
+  [ ! -e "$T/settings.json" ] || fail "file created"
+}
+
 for CASE in $(declare -F | awk '$3 ~ /^test_/ {print $3}'); do
   setup
   "$CASE"

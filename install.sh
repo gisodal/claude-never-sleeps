@@ -31,7 +31,7 @@ install_files() {
 }
 
 install_sudoers_rule() {
-  local rule=$1
+  local rule=$1 current
   echo "sudo asks for your password once, to add the pmset rule in $SUDOERS_FILE"
   "$SUDO" /usr/bin/install -m 0440 "$rule" "$SUDOERS_FILE"
   if [ "$("$SUDO" /bin/cat "$SUDOERS_FILE")" != "$(sudoers_rule_text)" ]; then
@@ -42,11 +42,15 @@ install_sudoers_rule() {
     "$SUDO" rm -f "$SUDOERS_FILE"
     die "sudo rejected the rule, so it was removed again"
   fi
-  "$SUDO" -n -l /usr/bin/pmset -a disablesleep 1 >/dev/null || die "sudo still asks a password for pmset"
+  # drop the cached credential, then a no-op write proves the rule works without a password
+  "$SUDO" -k
+  current=$(/usr/bin/pmset -g | awk '/SleepDisabled/ {print $2}')
+  "$SUDO" -n /usr/bin/pmset -a disablesleep "${current:-0}" || die "sudo still asks a password for pmset"
 }
 
 install_hook() {
-  [ -e "$SETTINGS" ] && cp "$SETTINGS" "$SETTINGS.claude-no-sleep.bak"
+  # the backup keeps the original from before the first install
+  if [ -e "$SETTINGS" ] && [ ! -e "$SETTINGS.claude-no-sleep.bak" ]; then cp "$SETTINGS" "$SETTINGS.claude-no-sleep.bak"; fi
   "${SETTINGS_HOOK[@]}" add "$SETTINGS" "$HOOK_COMMAND" >/dev/null
 }
 

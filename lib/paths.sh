@@ -1,7 +1,10 @@
 # Paths and commands shared by install.sh and uninstall.sh; tests override the system commands and the sudoers file.
 LABEL=dev.claude-no-sleep
-CLAUDE_DIR=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
-SETTINGS=$CLAUDE_DIR/settings.json
+use_claude_dir() {
+  CLAUDE_DIR=$1
+  SETTINGS=$CLAUDE_DIR/settings.json
+}
+use_claude_dir "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 INSTALL_DIR=$HOME/.local/share/claude-no-sleep
 STATE_DIR=$HOME/.local/state/claude-no-sleep
 PLIST=$HOME/Library/LaunchAgents/$LABEL.plist

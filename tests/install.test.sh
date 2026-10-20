@@ -11,8 +11,13 @@ setup() {
   cat >"$T/bin/sudo" <<FAKE
 #!/bin/bash
 echo "\$*" >>"$T/sudo_calls"
-[ "\$1" = -n ] && shift
+[ "\$1" = -k ] && exit 0
+if [ "\$1" = -n ]; then
+  shift
+  [ "\$1" = /usr/bin/pmset ] && [ -e "$T/sudo_n_pmset_fails" ] && exit 1
+fi
 [ "\$1" = -l ] && exit 0
+[ "\$1" = /usr/bin/pmset ] && [ -e "$T/sudo_pmset_fails" ] && exit 1
 [ "\$1" = /usr/bin/pmset ] && exit 0
 [ "\$1" = rm ] && [ -e "$T/sudo_rm_fails" ] && exit 1
 [ "\$1" = /usr/bin/install ] && [ -e "$T/sudo_install_tampers" ] && echo "tampered ALL=(ALL) NOPASSWD: ALL" >>"\$4"
@@ -33,7 +38,7 @@ FAKE
 teardown() { rm -rf "$T"; }
 
 with_fakes() {
-  HOME=$T/home CLAUDE_CONFIG_DIR= CLAUDE_NO_SLEEP_SUDOERS_FILE=$T/etc/sudoers.d/claude-no-sleep CLAUDE_NO_SLEEP_SUDO=$T/bin/sudo \
+  HOME=$T/home CLAUDE_CONFIG_DIR=${TEST_CLAUDE_DIR:-} CLAUDE_NO_SLEEP_SUDOERS_FILE=$T/etc/sudoers.d/claude-no-sleep CLAUDE_NO_SLEEP_SUDO=$T/bin/sudo \
     CLAUDE_NO_SLEEP_VISUDO=$T/bin/visudo CLAUDE_NO_SLEEP_LAUNCHCTL=$T/bin/launchctl CLAUDE_NO_SLEEP_PMSET=/bin/echo "$@" >"$T/out" 2>&1
 }
 
@@ -119,6 +124,42 @@ test_tampered_rule_is_removed() {
   with_fakes "$REPO/install.sh" && fail "install succeeded"
   [ ! -e "$T/etc/sudoers.d/claude-no-sleep" ] || fail "tampered rule left"
   grep -q "differs from the validated one" "$T/out" || fail "no tamper message"
+}
+
+test_install_fails_when_sudo_still_asks_a_password() {
+  user_settings
+  touch "$T/sudo_n_pmset_fails"
+  with_fakes "$REPO/install.sh" && fail "install succeeded"
+  grep -q "sudo still asks a password for pmset" "$T/out" || fail "no password message: $(cat "$T/out")"
+}
+
+test_uninstall_uses_the_claude_dir_recorded_at_install() {
+  mkdir -p "$T/other/sessions"
+  printf '{"model": "opus"}\n' >"$T/other/settings.json"
+  TEST_CLAUDE_DIR=$T/other with_fakes "$REPO/install.sh" || fail "install failed: $(cat "$T/out")"
+  [ "$(field "$T/other/settings.json" hooks.UserPromptSubmit)" = 1 ] || fail "hook not added to the other dir"
+  with_fakes "$T/home/.local/share/claude-no-sleep/uninstall.sh" || fail "uninstall failed: $(cat "$T/out")"
+  [ -z "$(field "$T/other/settings.json" hooks)" ] || fail "hook left in the other dir"
+  [ ! -e "$T/home/.claude/settings.json" ] || fail "default settings created"
+  [ ! -e "$T/home/.claude/settings.json.claude-no-sleep.bak" ] || fail "default backup created"
+}
+
+test_backup_keeps_the_pre_install_original() {
+  user_settings
+  cp "$T/home/.claude/settings.json" "$T/original.json"
+  with_fakes "$REPO/install.sh"
+  with_fakes "$REPO/install.sh"
+  with_fakes "$REPO/uninstall.sh"
+  cmp -s "$T/original.json" "$T/home/.claude/settings.json.claude-no-sleep.bak" || fail "backup differs from the original"
+}
+
+test_failed_sleep_restore_keeps_the_sudoers_rule() {
+  user_settings
+  with_fakes "$REPO/install.sh"
+  touch "$T/sudo_pmset_fails"
+  with_fakes "$T/home/.local/share/claude-no-sleep/uninstall.sh" && fail "uninstall succeeded"
+  [ -e "$T/etc/sudoers.d/claude-no-sleep" ] || fail "sudoers rule removed"
+  grep -q "not fully removed" "$T/out" || fail "no not-fully-removed message"
 }
 
 test_second_uninstall_skips_sudo() {

@@ -7,15 +7,23 @@ REPO_DIR=$(cd "$(dirname "$0")" && pwd)
 
 failed=0
 "$LAUNCHCTL" bootout "gui/$(id -u)/$LABEL" 2>/dev/null
+# the agent records the Claude dir the install used
+if [ -e "$PLIST" ] && recorded_dir=$(/usr/bin/plutil -extract EnvironmentVariables.CLAUDE_CONFIG_DIR raw -o - "$PLIST" 2>/dev/null); then
+  use_claude_dir "$recorded_dir"
+fi
 rm -f "$PLIST"
 if [ -e "$SETTINGS" ]; then
-  cp "$SETTINGS" "$SETTINGS.claude-no-sleep.bak"
+  [ -e "$SETTINGS.claude-no-sleep.bak" ] || cp "$SETTINGS" "$SETTINGS.claude-no-sleep.bak"
   "${SETTINGS_HOOK[@]}" remove "$SETTINGS" >/dev/null || { echo "claude-no-sleep: could not remove the hook from $SETTINGS" >&2; failed=1; }
 fi
 if [ -e "$SUDOERS_FILE" ]; then
   # turn sleep on while the sudoers rule still allows it without a password
-  "$SUDO" /usr/bin/pmset -a disablesleep 0 || failed=1
-  "$SUDO" rm -f "$SUDOERS_FILE" || failed=1
+  # keep the rule when that fails, so a rerun can still turn sleep on without a password
+  if "$SUDO" /usr/bin/pmset -a disablesleep 0; then
+    "$SUDO" rm -f "$SUDOERS_FILE" || failed=1
+  else
+    failed=1
+  fi
 fi
 if [ "$failed" = 1 ]; then
   echo "claude-no-sleep: not fully removed; fix the error above and run $INSTALL_DIR/uninstall.sh again" >&2
