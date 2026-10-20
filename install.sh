@@ -30,6 +30,10 @@ install_sudoers_rule() {
   local rule=$1
   echo "sudo asks for your password once, to add the pmset rule in $SUDOERS_FILE"
   "$SUDO" /usr/bin/install -m 0440 "$rule" "$SUDOERS_FILE"
+  if ! "$SUDO" /bin/cat "$SUDOERS_FILE" | /usr/bin/cmp -s - "$rule"; then
+    "$SUDO" rm -f "$SUDOERS_FILE"
+    die "the installed sudoers rule differs from the validated one, so it was removed"
+  fi
   if ! "$SUDO" "$VISUDO" -c -q; then
     "$SUDO" rm -f "$SUDOERS_FILE"
     die "sudo rejected the rule, so it was removed again"

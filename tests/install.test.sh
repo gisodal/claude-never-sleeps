@@ -14,6 +14,7 @@ echo "\$*" >>"$T/sudo_calls"
 [ "\$1" = -n ] && shift
 [ "\$1" = -l ] && exit 0
 [ "\$1" = /usr/bin/pmset ] && exit 0
+[ "\$1" = rm ] && [ -e "$T/sudo_rm_fails" ] && exit 1
 exec "\$@"
 FAKE
   cat >"$T/bin/visudo" <<FAKE
@@ -93,9 +94,31 @@ test_uninstall_removes_everything_and_keeps_user_settings() {
 
 test_uninstall_twice_is_harmless() {
   user_settings
+  cp "$T/home/.claude/settings.json" "$T/original.json"
   with_fakes "$REPO/install.sh"
   with_fakes "$REPO/uninstall.sh"
   with_fakes "$REPO/uninstall.sh" || fail "second uninstall failed: $(cat "$T/out")"
+  grep -q "could not remove" "$T/out" && fail "second uninstall could not remove the hook"
+  cmp -s "$T/original.json" "$T/home/.claude/settings.json" || fail "settings differ from the original"
+}
+
+test_failed_rule_removal_keeps_the_uninstaller() {
+  user_settings
+  with_fakes "$REPO/install.sh"
+  touch "$T/sudo_rm_fails"
+  with_fakes "$T/home/.local/share/claude-no-sleep/uninstall.sh" && fail "uninstall succeeded"
+  [ -e "$T/etc/sudoers.d/claude-no-sleep" ] || fail "sudoers rule removed"
+  [ -e "$T/home/.local/share/claude-no-sleep/uninstall.sh" ] || fail "uninstall.sh removed"
+  grep -q "not fully removed" "$T/out" || fail "no not-fully-removed message"
+}
+
+test_second_uninstall_skips_sudo() {
+  user_settings
+  with_fakes "$REPO/install.sh"
+  with_fakes "$REPO/uninstall.sh"
+  rm -f "$T/sudo_calls"
+  with_fakes "$REPO/uninstall.sh" || fail "second uninstall failed: $(cat "$T/out")"
+  [ ! -s "$T/sudo_calls" ] || fail "second uninstall called sudo"
 }
 
 for CASE in $(declare -F | awk '$3 ~ /^test_/ {print $3}'); do
