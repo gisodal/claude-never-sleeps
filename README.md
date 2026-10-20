@@ -69,6 +69,7 @@ If a step fails, it says so, keeps itself, and you run it again after you fix th
 - `~/.claude/sessions` is not a documented Claude Code interface, so an update can change it. An unknown status counts as idle and shows one macOS notification.
 - A Mac with the lid closed and sleep off stays on. Do not put it in a bag while a session works.
 - Sessions that already ran before the install get the prompt hook only after a restart; the 10 s poll covers them at once.
+- One user per Mac: the sudoers rule file and the sleep setting are shared, so a second user's install replaces the first.
 
 ## Tests
 
