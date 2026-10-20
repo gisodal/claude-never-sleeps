@@ -46,29 +46,31 @@ set_sleep_disabled() {
 # a pid counts only while the process that wrote the file runs; the registry stores its start as ps lstart in UTC
 session_process_alive() {
   local pid=$1 proc_start=$2 started
-  started=$(TZ=UTC "$PS" -o lstart= -p "$pid" 2>/dev/null) || return 1
+  started=$(LC_ALL=C TZ=UTC "$PS" -o lstart= -p "$pid" 2>/dev/null) || return 1
   [ "$(squeeze_spaces <<<"$started")" = "$(squeeze_spaces <<<"$proc_start")" ]
 }
 
-report_unknown_status() {
-  local status=$1
-  [ -e "$STATE_DIR/seen-status-$status" ] && return 0
-  touch "$STATE_DIR/seen-status-$status"
-  log "unknown session status '$status', counted as idle"
-  "$OSASCRIPT" -e "display notification \"Unknown session status '$status', counted as idle\" with title \"claude-no-sleep\"" >/dev/null 2>&1
+# log and notify once per key, so a changed registry does not repeat every poll
+report_once() {
+  local key=$1 message=$2
+  [ -e "$STATE_DIR/seen-$key" ] && return 0
+  touch "$STATE_DIR/seen-$key"
+  log "$message"
+  "$OSASCRIPT" -e "display notification \"$message\" with title \"claude-no-sleep\"" >/dev/null 2>&1
 }
 
 session_is_working() {
   local file=$1 pid status proc_start
-  pid=$(json_field "$file" pid) || return 1
-  status=$(json_field "$file" status) || return 1
-  proc_start=$(json_field "$file" procStart) || return 1
+  if ! pid=$(json_field "$file" pid) || ! status=$(json_field "$file" status) || ! proc_start=$(json_field "$file" procStart); then
+    report_once incomplete-file "session file without pid, status or procStart, counted as idle"
+    return 1
+  fi
   session_process_alive "$pid" "$proc_start" || return 1
   case $status in
     busy | shell) return 0 ;;
     idle) return 1 ;;
     *)
-      report_unknown_status "$status"
+      report_once "status-$status" "unknown session status '$status', counted as idle"
       return 1
       ;;
   esac

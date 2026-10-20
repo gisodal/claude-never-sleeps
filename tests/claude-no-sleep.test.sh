@@ -20,6 +20,8 @@ FAKE
   cat >"$T/bin/ps" <<FAKE
 #!/bin/bash
 [ -e "$T/procs/\$4" ] || exit 1
+# like the real ps, print a localized date unless LC_ALL=C
+[ "\${LC_ALL:-}" = C ] || { echo "Mo 12 Okt 17:39:44 2026"; exit 0; }
 cat "$T/procs/\$4"
 FAKE
   cat >"$T/bin/osascript" <<FAKE
@@ -97,6 +99,35 @@ test_file_without_proc_start_does_not_count() {
   echo "$START" >"$T/procs/101"
   run poll
   expect_sleep_disabled 0
+}
+
+test_locale_does_not_make_a_live_session_look_dead() {
+  session 101 busy
+  LC_ALL=de_DE.UTF-8 run poll
+  expect_sleep_disabled 1
+}
+
+test_incomplete_session_file_notifies_once_and_does_not_count() {
+  local count=0
+  echo 1 >"$T/sleep_disabled"
+  printf '{"pid":101,"status":"busy"}\n' >"$T/sessions/101.json"
+  echo "$START" >"$T/procs/101"
+  run poll
+  run poll
+  expect_sleep_disabled 0
+  [ -e "$T/notifications" ] && count=$(wc -l <"$T/notifications" | tr -d ' ')
+  [ "$count" = 1 ] || fail "$count notifications, want 1"
+  grep -q 'session file without pid, status or procStart, counted as idle' "$T/notifications" || fail "no message"
+}
+
+test_wake_prints_nothing_and_exits_0() {
+  local out
+  out=$(run wake)
+  [ $? = 0 ] && [ -z "$out" ] || fail "exit or stdout: $out"
+  touch "$T/pmset_fails"
+  echo 0 >"$T/sleep_disabled"
+  out=$(run wake)
+  [ $? = 0 ] && [ -z "$out" ] || fail "with failing pmset: exit or stdout: $out"
 }
 
 test_wake_survives_a_poll_that_still_reads_idle() { session 101 idle; run wake; run poll; expect_sleep_disabled 1; }
