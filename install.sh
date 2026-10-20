@@ -14,9 +14,13 @@ check_platform() {
 }
 
 # only the two exact commands the script runs, so the rule cannot be used for anything else
+sudoers_rule_text() {
+  echo "$(id -un) ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1"
+}
+
 write_sudoers_rule() {
   local rule=$1
-  echo "$(id -un) ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1" >"$rule"
+  sudoers_rule_text >"$rule"
   "$VISUDO" -c -q -f "$rule" || die "the sudoers rule failed validation; nothing installed"
 }
 
@@ -30,7 +34,7 @@ install_sudoers_rule() {
   local rule=$1
   echo "sudo asks for your password once, to add the pmset rule in $SUDOERS_FILE"
   "$SUDO" /usr/bin/install -m 0440 "$rule" "$SUDOERS_FILE"
-  if ! "$SUDO" /bin/cat "$SUDOERS_FILE" | /usr/bin/cmp -s - "$rule"; then
+  if [ "$("$SUDO" /bin/cat "$SUDOERS_FILE")" != "$(sudoers_rule_text)" ]; then
     "$SUDO" rm -f "$SUDOERS_FILE"
     die "the installed sudoers rule differs from the validated one, so it was removed"
   fi

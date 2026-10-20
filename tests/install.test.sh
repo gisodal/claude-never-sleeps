@@ -15,6 +15,7 @@ echo "\$*" >>"$T/sudo_calls"
 [ "\$1" = -l ] && exit 0
 [ "\$1" = /usr/bin/pmset ] && exit 0
 [ "\$1" = rm ] && [ -e "$T/sudo_rm_fails" ] && exit 1
+[ "\$1" = /usr/bin/install ] && [ -e "$T/sudo_install_tampers" ] && echo "tampered ALL=(ALL) NOPASSWD: ALL" >>"\$4"
 exec "\$@"
 FAKE
   cat >"$T/bin/visudo" <<FAKE
@@ -110,6 +111,14 @@ test_failed_rule_removal_keeps_the_uninstaller() {
   [ -e "$T/etc/sudoers.d/claude-no-sleep" ] || fail "sudoers rule removed"
   [ -e "$T/home/.local/share/claude-no-sleep/uninstall.sh" ] || fail "uninstall.sh removed"
   grep -q "not fully removed" "$T/out" || fail "no not-fully-removed message"
+}
+
+test_tampered_rule_is_removed() {
+  user_settings
+  touch "$T/sudo_install_tampers"
+  with_fakes "$REPO/install.sh" && fail "install succeeded"
+  [ ! -e "$T/etc/sudoers.d/claude-no-sleep" ] || fail "tampered rule left"
+  grep -q "differs from the validated one" "$T/out" || fail "no tamper message"
 }
 
 test_second_uninstall_skips_sudo() {
