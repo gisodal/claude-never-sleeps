@@ -140,13 +140,22 @@ test_old_wake_stamp_expires() {
   expect_sleep_disabled 0
 }
 
-test_manual_override_beats_idle() {
+test_keep_awake_beats_idle_until_auto() {
   session 101 idle
-  run manual-on
+  run keep-awake
   run poll
   expect_sleep_disabled 1
-  run manual-off
+  run auto
   expect_sleep_disabled 0
+}
+
+test_status_names_the_mode() {
+  local out
+  out=$(run status)
+  grep -q '^mode: auto (sessions decide)$' <<<"$out" || fail "no auto mode line in: $out"
+  run keep-awake
+  out=$(run status)
+  grep -q "^mode: keep awake (until 'claude-no-sleep auto')$" <<<"$out" || fail "no keep awake mode line in: $out"
 }
 
 test_no_write_when_value_already_matches() {

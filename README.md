@@ -45,14 +45,15 @@ If you set `CLAUDE_CONFIG_DIR`, the installer uses that folder instead of `~/.cl
 ```
 
 ```bash
-~/.local/share/claude-no-sleep/claude-no-sleep manual-on
+~/.local/share/claude-no-sleep/claude-no-sleep keep-awake
 ```
 
 ```bash
-~/.local/share/claude-no-sleep/claude-no-sleep manual-off
+~/.local/share/claude-no-sleep/claude-no-sleep auto
 ```
 
-`manual-on` keeps the Mac awake until `manual-off`, whatever the sessions do.
+`keep-awake` keeps the Mac awake, whatever the sessions do, until you run `auto`; it stays on across restarts.
+`auto` is the normal mode: the sessions decide. `status` shows the current mode.
 Each change is logged in `~/.local/state/claude-no-sleep/log`.
 
 ## Uninstall
