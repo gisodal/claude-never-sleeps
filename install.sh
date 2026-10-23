@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installs claude-never-sleeps for the current user: the script, a sudoers rule for two pmset commands, the Claude Code hook and the launchd agent.
+# Installs claude-never-sleeps for the current user: the binary, a sudoers rule for two pmset commands, the Claude Code hook and the launchd agent.
 set -euo pipefail
 
 REPO_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -8,12 +8,13 @@ REPO_DIR=$(cd "$(dirname "$0")" && pwd)
 check_platform() {
   [ "$(uname -s)" = Darwin ] || die "macOS only"
   [ "$(id -u)" != 0 ] || die "run this as your own user, not as root"
+  "$REPO_DIR/bin/claude-never-sleeps" version >/dev/null 2>&1 || die "no bin/claude-never-sleeps; build it with: go build -o bin/claude-never-sleeps ."
   [ -d "$CLAUDE_DIR" ] || die "no $CLAUDE_DIR; start Claude Code once first"
   [ -d "$CLAUDE_DIR/sessions" ] || echo "claude-never-sleeps: warning: no $CLAUDE_DIR/sessions; it needs Claude Code 2.1.296 or newer" >&2
   if [ -e "$SETTINGS" ]; then "${SETTINGS_HOOK[@]}" check "$SETTINGS" >/dev/null || die "$SETTINGS is not valid JSON; nothing installed"; fi
 }
 
-# only the two exact commands the script runs, so the rule cannot be used for anything else
+# only the two exact commands the binary runs, so the rule cannot be used for anything else
 sudoers_rule_text() {
   echo "$(id -un) ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1"
 }
@@ -57,7 +58,7 @@ install_hook() {
 install_launch_agent() {
   local attempt
   mkdir -p "$(dirname "$PLIST")"
-  sed -e "s|__LABEL__|$LABEL|" -e "s|__SCRIPT__|$INSTALL_DIR/claude-never-sleeps|" \
+  sed -e "s|__LABEL__|$LABEL|" -e "s|__BINARY__|$INSTALL_DIR/claude-never-sleeps|" \
     -e "s|__CLAUDE_DIR__|$CLAUDE_DIR|" -e "s|__STATE_DIR__|$STATE_DIR|" \
     "$REPO_DIR/launchd/claude-never-sleeps.plist.template" >"$PLIST"
   /usr/bin/plutil -lint -s "$PLIST"

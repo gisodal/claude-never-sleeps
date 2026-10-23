@@ -6,8 +6,7 @@
   <string>__LABEL__</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/bash</string>
-    <string>__SCRIPT__</string>
+    <string>__BINARY__</string>
     <string>poll</string>
   </array>
   <key>EnvironmentVariables</key>

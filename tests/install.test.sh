@@ -53,10 +53,11 @@ test_install_sets_up_everything() {
   [ -x "$T/home/.local/share/claude-never-sleeps/claude-never-sleeps" ] || fail "script not installed"
   [ -x "$T/home/.local/share/claude-never-sleeps/uninstall.sh" ] || fail "uninstall.sh not installed"
   grep -q "^$(id -un) ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1$" "$T/etc/sudoers.d/claude-never-sleeps" || fail "sudoers rule wrong"
-  [ "$(field "$T/home/Library/LaunchAgents/dev.claude-never-sleeps.plist" ProgramArguments.1)" = "$T/home/.local/share/claude-never-sleeps/claude-never-sleeps" ] || fail "plist script path wrong"
+  [ "$(field "$T/home/Library/LaunchAgents/dev.claude-never-sleeps.plist" ProgramArguments.0)" = "$T/home/.local/share/claude-never-sleeps/claude-never-sleeps" ] || fail "plist binary path wrong"
+  [ "$(field "$T/home/Library/LaunchAgents/dev.claude-never-sleeps.plist" ProgramArguments.1)" = poll ] || fail "plist mode wrong"
   [ "$(field "$T/home/Library/LaunchAgents/dev.claude-never-sleeps.plist" EnvironmentVariables.CLAUDE_CONFIG_DIR)" = "$T/home/.claude" ] || fail "plist CLAUDE_CONFIG_DIR wrong"
   grep -q "^bootstrap gui/$(id -u) $T/home/Library/LaunchAgents/dev.claude-never-sleeps.plist$" "$T/launchctl_calls" || fail "agent not bootstrapped"
-  [ "$(field "$T/home/.claude/settings.json" hooks.UserPromptSubmit.0.hooks.0.command)" = "/bin/bash '$T/home/.local/share/claude-never-sleeps/claude-never-sleeps' wake" ] || fail "hook not added"
+  [ "$(field "$T/home/.claude/settings.json" hooks.UserPromptSubmit.0.hooks.0.command)" = "'$T/home/.local/share/claude-never-sleeps/claude-never-sleeps' wake" ] || fail "hook not added"
   [ "$(field "$T/home/.claude/settings.json" hooks.Stop.0.hooks.0.command)" = my-stop-hook.sh ] || fail "user hook lost"
 }
 
@@ -65,6 +66,23 @@ test_install_twice_gives_one_hook() {
   with_fakes "$REPO/install.sh"
   with_fakes "$REPO/install.sh" || fail "second install failed: $(cat "$T/out")"
   [ "$(field "$T/home/.claude/settings.json" hooks.UserPromptSubmit)" = 1 ] || fail "want one hook group"
+}
+
+test_upgrade_from_the_bash_hook_leaves_one_hook() {
+  printf '{"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command": "/bin/bash '"'"'/opt/example/claude-never-sleeps/claude-never-sleeps'"'"' wake"}]}]}}\n' >"$T/home/.claude/settings.json"
+  with_fakes "$REPO/install.sh" || fail "install failed: $(cat "$T/out")"
+  [ "$(field "$T/home/.claude/settings.json" hooks.UserPromptSubmit)" = 1 ] || fail "want one hook group"
+  [ "$(field "$T/home/.claude/settings.json" hooks.UserPromptSubmit.0.hooks.0.command)" = "'$T/home/.local/share/claude-never-sleeps/claude-never-sleeps' wake" ] || fail "hook not replaced"
+}
+
+test_missing_binary_stops_before_any_change() {
+  user_settings
+  mkdir -p "$T/repo"
+  cp -R "$REPO/install.sh" "$REPO/uninstall.sh" "$REPO/lib" "$REPO/launchd" "$T/repo/"
+  with_fakes "$T/repo/install.sh" && fail "install succeeded"
+  grep -qF 'go build -o bin/claude-never-sleeps .' "$T/out" || fail "no build hint: $(cat "$T/out")"
+  [ ! -e "$T/home/.local/share/claude-never-sleeps" ] || fail "files installed"
+  [ ! -e "$T/etc/sudoers.d/claude-never-sleeps" ] || fail "sudoers rule installed"
 }
 
 test_invalid_settings_stops_before_any_change() {

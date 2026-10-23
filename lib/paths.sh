@@ -12,7 +12,7 @@ SUDOERS_FILE=${CLAUDE_NEVER_SLEEPS_SUDOERS_FILE:-/etc/sudoers.d/claude-never-sle
 SUDO=${CLAUDE_NEVER_SLEEPS_SUDO:-/usr/bin/sudo}
 VISUDO=${CLAUDE_NEVER_SLEEPS_VISUDO:-/usr/sbin/visudo}
 LAUNCHCTL=${CLAUDE_NEVER_SLEEPS_LAUNCHCTL:-/bin/launchctl}
-HOOK_COMMAND="/bin/bash '$INSTALL_DIR/claude-never-sleeps' wake"
+HOOK_COMMAND="'$INSTALL_DIR/claude-never-sleeps' wake"
 SETTINGS_HOOK=(/usr/bin/osascript -l JavaScript "$REPO_DIR/lib/settings-hook.js")
 
 die() {
