@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installs claude-no-sleep for the current user: the script, a sudoers rule for two pmset commands, the Claude Code hook and the launchd agent.
+# Installs claude-never-sleeps for the current user: the script, a sudoers rule for two pmset commands, the Claude Code hook and the launchd agent.
 set -euo pipefail
 
 REPO_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -9,7 +9,7 @@ check_platform() {
   [ "$(uname -s)" = Darwin ] || die "macOS only"
   [ "$(id -u)" != 0 ] || die "run this as your own user, not as root"
   [ -d "$CLAUDE_DIR" ] || die "no $CLAUDE_DIR; start Claude Code once first"
-  [ -d "$CLAUDE_DIR/sessions" ] || echo "claude-no-sleep: warning: no $CLAUDE_DIR/sessions; it needs Claude Code 2.1.296 or newer" >&2
+  [ -d "$CLAUDE_DIR/sessions" ] || echo "claude-never-sleeps: warning: no $CLAUDE_DIR/sessions; it needs Claude Code 2.1.296 or newer" >&2
   if [ -e "$SETTINGS" ]; then "${SETTINGS_HOOK[@]}" check "$SETTINGS" >/dev/null || die "$SETTINGS is not valid JSON; nothing installed"; fi
 }
 
@@ -26,7 +26,7 @@ write_sudoers_rule() {
 
 install_files() {
   mkdir -p "$INSTALL_DIR/lib" "$STATE_DIR"
-  /usr/bin/install -m 755 "$REPO_DIR/bin/claude-no-sleep" "$REPO_DIR/uninstall.sh" "$INSTALL_DIR/"
+  /usr/bin/install -m 755 "$REPO_DIR/bin/claude-never-sleeps" "$REPO_DIR/uninstall.sh" "$INSTALL_DIR/"
   /usr/bin/install -m 644 "$REPO_DIR/lib/paths.sh" "$REPO_DIR/lib/settings-hook.js" "$INSTALL_DIR/lib/"
 }
 
@@ -50,16 +50,16 @@ install_sudoers_rule() {
 
 install_hook() {
   # the backup keeps the original from before the first install
-  if [ -e "$SETTINGS" ] && [ ! -e "$SETTINGS.claude-no-sleep.bak" ]; then cp "$SETTINGS" "$SETTINGS.claude-no-sleep.bak"; fi
+  if [ -e "$SETTINGS" ] && [ ! -e "$SETTINGS.claude-never-sleeps.bak" ]; then cp "$SETTINGS" "$SETTINGS.claude-never-sleeps.bak"; fi
   "${SETTINGS_HOOK[@]}" add "$SETTINGS" "$HOOK_COMMAND" >/dev/null
 }
 
 install_launch_agent() {
   local attempt
   mkdir -p "$(dirname "$PLIST")"
-  sed -e "s|__LABEL__|$LABEL|" -e "s|__SCRIPT__|$INSTALL_DIR/claude-no-sleep|" \
+  sed -e "s|__LABEL__|$LABEL|" -e "s|__SCRIPT__|$INSTALL_DIR/claude-never-sleeps|" \
     -e "s|__CLAUDE_DIR__|$CLAUDE_DIR|" -e "s|__STATE_DIR__|$STATE_DIR|" \
-    "$REPO_DIR/launchd/claude-no-sleep.plist.template" >"$PLIST"
+    "$REPO_DIR/launchd/claude-never-sleeps.plist.template" >"$PLIST"
   /usr/bin/plutil -lint -s "$PLIST"
   "$LAUNCHCTL" bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
   # bootstrap right after bootout can fail while launchd still removes the old job
@@ -72,15 +72,15 @@ install_launch_agent() {
 
 main() {
   check_platform
-  RULE_FILE=$(mktemp "${TMPDIR:-/tmp}/claude-no-sleep-sudoers.XXXXXX")
+  RULE_FILE=$(mktemp "${TMPDIR:-/tmp}/claude-never-sleeps-sudoers.XXXXXX")
   trap 'rm -f "$RULE_FILE"' EXIT
   write_sudoers_rule "$RULE_FILE"
   install_files
   install_sudoers_rule "$RULE_FILE"
   install_hook
   install_launch_agent
-  "$INSTALL_DIR/claude-no-sleep" status
-  echo "claude-no-sleep is installed. Remove it with: $INSTALL_DIR/uninstall.sh"
+  "$INSTALL_DIR/claude-never-sleeps" status
+  echo "claude-never-sleeps is installed. Remove it with: $INSTALL_DIR/uninstall.sh"
 }
 
 main "$@"

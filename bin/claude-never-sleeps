@@ -5,12 +5,12 @@
 set -u
 
 CLAUDE_DIR=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
-SESSIONS_DIR=${CLAUDE_NO_SLEEP_SESSIONS_DIR:-$CLAUDE_DIR/sessions}
-STATE_DIR=${CLAUDE_NO_SLEEP_STATE_DIR:-$HOME/.local/state/claude-no-sleep}
-PMSET=${CLAUDE_NO_SLEEP_PMSET:-/usr/bin/pmset}
-SUDO=${CLAUDE_NO_SLEEP_SUDO-/usr/bin/sudo -n}
-PS=${CLAUDE_NO_SLEEP_PS:-/bin/ps}
-OSASCRIPT=${CLAUDE_NO_SLEEP_OSASCRIPT:-/usr/bin/osascript}
+SESSIONS_DIR=${CLAUDE_NEVER_SLEEPS_SESSIONS_DIR:-$CLAUDE_DIR/sessions}
+STATE_DIR=${CLAUDE_NEVER_SLEEPS_STATE_DIR:-$HOME/.local/state/claude-never-sleeps}
+PMSET=${CLAUDE_NEVER_SLEEPS_PMSET:-/usr/bin/pmset}
+SUDO=${CLAUDE_NEVER_SLEEPS_SUDO-/usr/bin/sudo -n}
+PS=${CLAUDE_NEVER_SLEEPS_PS:-/bin/ps}
+OSASCRIPT=${CLAUDE_NEVER_SLEEPS_OSASCRIPT:-/usr/bin/osascript}
 
 KEEP_AWAKE_FLAG=$STATE_DIR/keep-awake
 WAKE_STAMP=$STATE_DIR/wake
@@ -56,7 +56,7 @@ report_once() {
   [ -e "$STATE_DIR/seen-$key" ] && return 0
   touch "$STATE_DIR/seen-$key"
   log "$message"
-  "$OSASCRIPT" -e "display notification \"$message\" with title \"claude-no-sleep\"" >/dev/null 2>&1
+  "$OSASCRIPT" -e "display notification \"$message\" with title \"claude-never-sleeps\"" >/dev/null 2>&1
 }
 
 session_is_working() {
@@ -110,7 +110,7 @@ wake() {
 status() {
   local file working
   echo "SleepDisabled: $(sleep_disabled_now)"
-  if [ -e "$KEEP_AWAKE_FLAG" ]; then echo "mode: keep awake (until 'claude-no-sleep auto')"; else echo "mode: auto (sessions decide)"; fi
+  if [ -e "$KEEP_AWAKE_FLAG" ]; then echo "mode: keep awake (until 'claude-never-sleeps auto')"; else echo "mode: auto (sessions decide)"; fi
   for file in "$SESSIONS_DIR"/*.json; do
     [ -e "$file" ] || continue
     working=no
@@ -127,7 +127,7 @@ case "${1:-}" in
   keep-awake) touch "$KEEP_AWAKE_FLAG" && poll ;;
   auto) rm -f "$KEEP_AWAKE_FLAG" && poll ;;
   *)
-    echo "usage: claude-no-sleep poll|wake|status|keep-awake|auto" >&2
+    echo "usage: claude-never-sleeps poll|wake|status|keep-awake|auto" >&2
     exit 1
     ;;
 esac

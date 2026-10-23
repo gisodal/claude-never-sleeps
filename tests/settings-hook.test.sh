@@ -3,7 +3,7 @@
 set -u
 
 JS=$(cd "$(dirname "$0")/.." && pwd)/lib/settings-hook.js
-HOOK="/bin/bash '/opt/example/claude-no-sleep/claude-no-sleep' wake"
+HOOK="/bin/bash '/opt/example/claude-never-sleeps/claude-never-sleeps' wake"
 FAILURES=0
 
 setup() { T=$(mktemp -d "${TMPDIR:-/tmp}/settings-hook-test.XXXXXX"); }

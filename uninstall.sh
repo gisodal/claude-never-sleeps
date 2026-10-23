@@ -1,5 +1,5 @@
 #!/bin/bash
-# Removes claude-no-sleep: the launchd agent, the Claude Code hook, the sudoers rule and the installed files, and turns sleep back on.
+# Removes claude-never-sleeps: the launchd agent, the Claude Code hook, the sudoers rule and the installed files, and turns sleep back on.
 set -uo pipefail
 
 REPO_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -13,8 +13,8 @@ if [ -e "$PLIST" ] && recorded_dir=$(/usr/bin/plutil -extract EnvironmentVariabl
 fi
 rm -f "$PLIST"
 if [ -e "$SETTINGS" ]; then
-  [ -e "$SETTINGS.claude-no-sleep.bak" ] || cp "$SETTINGS" "$SETTINGS.claude-no-sleep.bak"
-  "${SETTINGS_HOOK[@]}" remove "$SETTINGS" >/dev/null || { echo "claude-no-sleep: could not remove the hook from $SETTINGS" >&2; failed=1; }
+  [ -e "$SETTINGS.claude-never-sleeps.bak" ] || cp "$SETTINGS" "$SETTINGS.claude-never-sleeps.bak"
+  "${SETTINGS_HOOK[@]}" remove "$SETTINGS" >/dev/null || { echo "claude-never-sleeps: could not remove the hook from $SETTINGS" >&2; failed=1; }
 fi
 if [ -e "$SUDOERS_FILE" ]; then
   # turn sleep on while the sudoers rule still allows it without a password
@@ -26,8 +26,8 @@ if [ -e "$SUDOERS_FILE" ]; then
   fi
 fi
 if [ "$failed" = 1 ]; then
-  echo "claude-no-sleep: not fully removed; fix the error above and run $INSTALL_DIR/uninstall.sh again" >&2
+  echo "claude-never-sleeps: not fully removed; fix the error above and run $INSTALL_DIR/uninstall.sh again" >&2
   exit 1
 fi
 rm -rf "$STATE_DIR" "$INSTALL_DIR"
-echo "claude-no-sleep is removed."
+echo "claude-never-sleeps is removed."

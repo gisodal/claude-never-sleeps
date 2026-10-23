@@ -1,13 +1,13 @@
 #!/bin/bash
-# Tests for bin/claude-no-sleep with fake pmset, ps and osascript; no sudo needed.
+# Tests for bin/claude-never-sleeps with fake pmset, ps and osascript; no sudo needed.
 set -u
 
-SCRIPT=${1:-$(cd "$(dirname "$0")/.." && pwd)/bin/claude-no-sleep}
+SCRIPT=${1:-$(cd "$(dirname "$0")/.." && pwd)/bin/claude-never-sleeps}
 FAILURES=0
 START="Mon Oct 12 17:39:44 2026"
 
 setup() {
-  T=$(mktemp -d "${TMPDIR:-/tmp}/claude-no-sleep-test.XXXXXX")
+  T=$(mktemp -d "${TMPDIR:-/tmp}/claude-never-sleeps-test.XXXXXX")
   mkdir -p "$T/sessions" "$T/state" "$T/procs" "$T/bin"
   echo 0 >"$T/sleep_disabled"
   cat >"$T/bin/pmset" <<FAKE
@@ -34,8 +34,8 @@ FAKE
 teardown() { rm -rf "$T"; }
 
 run() {
-  CLAUDE_NO_SLEEP_SESSIONS_DIR=$T/sessions CLAUDE_NO_SLEEP_STATE_DIR=$T/state CLAUDE_NO_SLEEP_PMSET=$T/bin/pmset \
-    CLAUDE_NO_SLEEP_SUDO= CLAUDE_NO_SLEEP_PS=$T/bin/ps CLAUDE_NO_SLEEP_OSASCRIPT=$T/bin/osascript /bin/bash "$SCRIPT" "$@"
+  CLAUDE_NEVER_SLEEPS_SESSIONS_DIR=$T/sessions CLAUDE_NEVER_SLEEPS_STATE_DIR=$T/state CLAUDE_NEVER_SLEEPS_PMSET=$T/bin/pmset \
+    CLAUDE_NEVER_SLEEPS_SUDO= CLAUDE_NEVER_SLEEPS_PS=$T/bin/ps CLAUDE_NEVER_SLEEPS_OSASCRIPT=$T/bin/osascript /bin/bash "$SCRIPT" "$@"
 }
 
 # session PID STATUS [PROC_START]: a registry file plus a live fake process that started at PROC_START
@@ -155,7 +155,7 @@ test_status_names_the_mode() {
   grep -q '^mode: auto (sessions decide)$' <<<"$out" || fail "no auto mode line in: $out"
   run keep-awake
   out=$(run status)
-  grep -q "^mode: keep awake (until 'claude-no-sleep auto')$" <<<"$out" || fail "no keep awake mode line in: $out"
+  grep -q "^mode: keep awake (until 'claude-never-sleeps auto')$" <<<"$out" || fail "no keep awake mode line in: $out"
 }
 
 test_no_write_when_value_already_matches() {
@@ -217,4 +217,4 @@ for CASE in $(declare -F | awk '$3 ~ /^test_/ {print $3}'); do
   teardown
 done
 
-if [ "$FAILURES" = 0 ]; then echo "claude-no-sleep: all tests passed"; else echo "claude-no-sleep: $FAILURES failure(s)"; exit 1; fi
+if [ "$FAILURES" = 0 ]; then echo "claude-never-sleeps: all tests passed"; else echo "claude-never-sleeps: $FAILURES failure(s)"; exit 1; fi
