@@ -76,8 +76,9 @@ main() {
   RULE_FILE=$(mktemp "${TMPDIR:-/tmp}/claude-never-sleeps-sudoers.XXXXXX")
   trap 'rm -f "$RULE_FILE"' EXIT
   write_sudoers_rule "$RULE_FILE"
-  install_files
+  # the binary replaces an older one only after the password step, which the user can abort
   install_sudoers_rule "$RULE_FILE"
+  install_files
   install_hook
   install_launch_agent
   "$INSTALL_DIR/claude-never-sleeps" status

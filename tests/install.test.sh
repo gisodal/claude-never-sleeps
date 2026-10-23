@@ -20,6 +20,7 @@ fi
 [ "\$1" = /usr/bin/pmset ] && [ -e "$T/sudo_pmset_fails" ] && exit 1
 [ "\$1" = /usr/bin/pmset ] && exit 0
 [ "\$1" = rm ] && [ -e "$T/sudo_rm_fails" ] && exit 1
+[ "\$1" = /usr/bin/install ] && [ -e "$T/sudo_install_fails" ] && exit 1
 [ "\$1" = /usr/bin/install ] && [ -e "$T/sudo_install_tampers" ] && echo "tampered ALL=(ALL) NOPASSWD: ALL" >>"\$4"
 exec "\$@"
 FAKE
@@ -134,6 +135,13 @@ test_failed_rule_removal_keeps_the_uninstaller() {
   [ -e "$T/etc/sudoers.d/claude-never-sleeps" ] || fail "sudoers rule removed"
   [ -e "$T/home/.local/share/claude-never-sleeps/uninstall.sh" ] || fail "uninstall.sh removed"
   grep -q "not fully removed" "$T/out" || fail "no not-fully-removed message"
+}
+
+test_failed_sudoers_install_leaves_the_old_install_alone() {
+  user_settings
+  touch "$T/sudo_install_fails"
+  with_fakes "$REPO/install.sh" && fail "install succeeded"
+  [ ! -e "$T/home/.local/share/claude-never-sleeps" ] || fail "files installed before the sudoers rule"
 }
 
 test_tampered_rule_is_removed() {

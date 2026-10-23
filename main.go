@@ -1,5 +1,4 @@
 // Command claude-never-sleeps keeps the Mac awake, lid close included, while any Claude Code session works.
-// launchd runs "poll" every 10 s; the UserPromptSubmit hook runs "wake" so a lid closed right after a prompt cannot beat the first poll.
 package main
 
 import (
@@ -127,6 +126,7 @@ func problemMessage(judged verdict) string {
 	return fmt.Sprintf("unknown session status '%s', counted as idle", judged.Status)
 }
 
+// wake runs from the UserPromptSubmit hook, so a lid closed right after a prompt cannot beat the next poll.
 func (a app) wake() {
 	a.state.touch(wakeStamp)
 	a.power.setSleepDisabled("1", "prompt")
